@@ -392,8 +392,7 @@ Loading...
 
 <script>
 
-const db =
-window.supabase.createClient(
+const db = window.supabase.createClient(
 "https://tuihpvykuqbqnfyfepql.supabase.co",
 "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1aWhwdnlrdXFicW5meWZlcHFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3Mjg4OTcsImV4cCI6MjA5NzMwNDg5N30.HZKS8CgFLjkZ-Bx2AIjFjurH3IsKjvf37Ft852CzJsQ"
 );
@@ -401,10 +400,211 @@ window.supabase.createClient(
 const currentUser =
 JSON.parse(localStorage.getItem("currentUser"));
 
-document.getElementById("managerInfo").innerHTML=
-currentUser.full_name+
-" • "+
-currentUser.role;
+if(!currentUser){
+location.href="https://interfreight.github.io/login/";
+}
+
+document.getElementById("managerInfo").innerHTML =
+currentUser.full_name + " • " + currentUser.role;
+
+
+// Detect manager department
+function getManagerDepartment(){
+
+const role = (currentUser.role || "").toUpperCase();
+
+if(role==="TRANSPORT MANAGER") return "Transport";
+if(role==="OPERATIONS MANAGER") return "Operations";
+if(role==="SALES MANAGER") return "Sales";
+if(role==="ACCOUNTING MANAGER") return "Accounting";
+if(role==="FORWARDING MANAGER") return "Forwarding";
+if(role==="HR") return "ALL";
+
+return null;
+
+}
+
+
+// Load Leave History
+async function loadHistory(){
+
+const tbody =
+document.getElementById("historyTable");
+
+tbody.innerHTML =
+"<tr><td colspan='9'>Loading...</td></tr>";
+
+let query =
+db
+.from("employee_leaves")
+.select("*")
+.in("status",["Approved","Rejected"])
+.order("approved_date",{ascending:false});
+
+const dept =
+getManagerDepartment();
+
+if(dept!=="ALL"){
+
+query =
+query.eq("department",dept);
+
+}
+
+const {data,error} =
+await query;
+
+if(error){
+
+tbody.innerHTML =
+"<tr><td colspan='9'>"+error.message+"</td></tr>";
+
+return;
+
+}
+
+renderTable(data);
+
+}
+
+
+// Display table
+function renderTable(data){
+
+const tbody =
+document.getElementById("historyTable");
+
+tbody.innerHTML="";
+
+let approved=0;
+let rejected=0;
+
+data.forEach(row=>{
+
+if(row.status==="Approved") approved++;
+if(row.status==="Rejected") rejected++;
+
+tbody.innerHTML += `
+
+<tr>
+
+<td>${row.employee_name}</td>
+
+<td>${row.department}</td>
+
+<td>${row.leave_type}</td>
+
+<td>${row.date_from}</td>
+
+<td>${row.date_to}</td>
+
+<td>${row.total_days}</td>
+
+<td>
+
+<span class="status ${row.status.toLowerCase()}">
+
+${row.status}
+
+</span>
+
+</td>
+
+<td>${row.approved_by || "-"}</td>
+
+<td>
+
+${row.approved_date ?
+
+new Date(row.approved_date).toLocaleString()
+
+: "-"}
+
+</td>
+
+</tr>
+
+`;
+
+});
+
+document.getElementById("approvedCount").textContent =
+approved;
+
+document.getElementById("rejectedCount").textContent =
+rejected;
+
+document.getElementById("totalCount").textContent =
+data.length;
+
+window.leaveData = data;
+
+}
+
+
+// SEARCH/FILTER
+function applyFilters(){
+
+let rows =
+window.leaveData || [];
+
+const employee =
+document.getElementById("searchEmployee").value.toLowerCase();
+
+const status =
+document.getElementById("statusFilter").value;
+
+const leave =
+document.getElementById("leaveTypeFilter").value;
+
+const date =
+document.getElementById("dateFilter").value;
+
+rows =
+rows.filter(r=>{
+
+if(employee &&
+!r.employee_name.toLowerCase().includes(employee))
+return false;
+
+if(status!="ALL" &&
+r.status!=status)
+return false;
+
+if(leave!="ALL" &&
+r.leave_type!=leave)
+return false;
+
+if(date &&
+r.date_from!=date)
+return false;
+
+return true;
+
+});
+
+renderTable(rows);
+
+}
+
+
+document.getElementById("searchEmployee")
+.addEventListener("keyup",applyFilters);
+
+document.getElementById("statusFilter")
+.addEventListener("change",applyFilters);
+
+document.getElementById("leaveTypeFilter")
+.addEventListener("change",applyFilters);
+
+document.getElementById("dateFilter")
+.addEventListener("change",applyFilters);
+
+
+// Auto Refresh every 5 seconds
+loadHistory();
+
+setInterval(loadHistory,5000);
 
 </script>
 
